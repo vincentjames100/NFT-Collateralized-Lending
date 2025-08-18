@@ -15,6 +15,8 @@
 (define-constant LIQUIDATION_THRESHOLD u75)
 (define-constant INTEREST_RATE u5)
 (define-constant AUCTION_DURATION u12)
+(define-constant EXTENSION_DURATION u144)
+(define-constant EXTENSION_FEE_RATE u3)
 
 (define-data-var loan-id-nonce uint u0)
 (define-data-var auction-id-nonce uint u0)
@@ -39,6 +41,7 @@
     interest-amount: uint,
     start-block: uint,
     due-block: uint,
+    extensions-count: uint,
     status: (string-ascii 20)
   }
 )
@@ -90,6 +93,7 @@
         interest-amount: interest,
         start-block: current-block,
         due-block: due-block,
+        extensions-count: u0,
         status: "active"
       }
     )
@@ -235,6 +239,31 @@
   )
 )
 
+(define-public (extend-loan (loan-id uint))
+  (let
+    (
+      (loan (unwrap! (map-get? loans loan-id) ERR_LOAN_NOT_FOUND))
+      (extension-fee (/ (* (get loan-amount loan) EXTENSION_FEE_RATE) u100))
+      (new-due-block (+ (get due-block loan) EXTENSION_DURATION))
+      (new-extensions-count (+ (get extensions-count loan) u1))
+    )
+    (asserts! (is-eq tx-sender (get borrower loan)) ERR_NOT_AUTHORIZED)
+    (asserts! (is-eq (get status loan) "active") ERR_LOAN_NOT_FOUND)
+    (asserts! (< (get extensions-count loan) u3) ERR_NOT_AUTHORIZED)
+    (asserts! (> stacks-block-height (- (get due-block loan) u24)) ERR_NOT_AUTHORIZED)
+    
+    (try! (stx-transfer? extension-fee tx-sender (as-contract tx-sender)))
+    
+    (map-set loans loan-id (merge loan
+      {
+        due-block: new-due-block,
+        extensions-count: new-extensions-count
+      }
+    ))
+    (ok true)
+  )
+)
+
 (define-public (emergency-withdraw (loan-id uint))
   (let
     (
@@ -327,4 +356,33 @@
 
 (define-private (is-loan-liquidatable-helper (loan-id uint))
   (is-loan-liquidatable loan-id)
+)
+
+(define-read-only (get-extension-cost (loan-id uint))
+  (match (map-get? loans loan-id)
+    loan (let
+      (
+        (extension-fee (/ (* (get loan-amount loan) EXTENSION_FEE_RATE) u100))
+      )
+      (some extension-fee)
+    )
+    none
+  )
+)
+
+(define-read-only (can-extend-loan (loan-id uint))
+  (match (map-get? loans loan-id)
+    loan (let
+      (
+        (current-block stacks-block-height)
+        (blocks-until-due (- (get due-block loan) current-block))
+      )
+      (and
+        (is-eq (get status loan) "active")
+        (< (get extensions-count loan) u3)
+        (<= blocks-until-due u24)
+      )
+    )
+    false
+  )
 )
