@@ -17,6 +17,7 @@
 (define-constant AUCTION_DURATION u12)
 (define-constant EXTENSION_DURATION u144)
 (define-constant EXTENSION_FEE_RATE u3)
+(define-constant MAX_BATCH_SIZE u10)
 
 (define-data-var loan-id-nonce uint u0)
 (define-data-var auction-id-nonce uint u0)
@@ -384,5 +385,111 @@
       )
     )
     false
+  )
+)
+
+(define-public (batch-repay-loans (loan-ids (list 10 uint)))
+  (let
+    (
+      (batch-size (len loan-ids))
+    )
+    (asserts! (<= batch-size MAX_BATCH_SIZE) ERR_INVALID_AMOUNT)
+    (asserts! (> batch-size u0) ERR_INVALID_AMOUNT)
+    (fold process-loan-repayment loan-ids (ok (list)))
+  )
+)
+
+(define-public (batch-extend-loans (loan-ids (list 10 uint)))
+  (let
+    (
+      (batch-size (len loan-ids))
+    )
+    (asserts! (<= batch-size MAX_BATCH_SIZE) ERR_INVALID_AMOUNT)
+    (asserts! (> batch-size u0) ERR_INVALID_AMOUNT)
+    (fold process-loan-extension loan-ids (ok (list)))
+  )
+)
+
+(define-public (batch-liquidate-loans (loan-ids (list 10 uint)))
+  (let
+    (
+      (batch-size (len loan-ids))
+    )
+    (asserts! (<= batch-size MAX_BATCH_SIZE) ERR_INVALID_AMOUNT)
+    (asserts! (> batch-size u0) ERR_INVALID_AMOUNT)
+    (fold process-loan-liquidation loan-ids (ok (list)))
+  )
+)
+
+(define-public (batch-place-bids (bid-data (list 10 { auction-id: uint, bid-amount: uint })))
+  (let
+    (
+      (batch-size (len bid-data))
+    )
+    (asserts! (<= batch-size MAX_BATCH_SIZE) ERR_INVALID_AMOUNT)
+    (asserts! (> batch-size u0) ERR_INVALID_AMOUNT)
+    (fold process-bid-placement bid-data (ok (list)))
+  )
+)
+
+(define-private (process-loan-repayment (loan-id uint) (previous-result (response (list 10 uint) uint)))
+  (match previous-result
+    success-list (match (repay-loan loan-id)
+      success (ok (unwrap! (as-max-len? (append success-list loan-id) u10) ERR_INVALID_AMOUNT))
+      error-code (err error-code)
+    )
+    error-code (err error-code)
+  )
+)
+
+(define-private (process-loan-extension (loan-id uint) (previous-result (response (list 10 uint) uint)))
+  (match previous-result
+    success-list (match (extend-loan loan-id)
+      success (ok (unwrap! (as-max-len? (append success-list loan-id) u10) ERR_INVALID_AMOUNT))
+      error-code (err error-code)
+    )
+    error-code (err error-code)
+  )
+)
+
+(define-private (process-loan-liquidation (loan-id uint) (previous-result (response (list 10 uint) uint)))
+  (match previous-result
+    success-list (match (liquidate-loan loan-id)
+      success (ok (unwrap! (as-max-len? (append success-list loan-id) u10) ERR_INVALID_AMOUNT))
+      error-code (err error-code)
+    )
+    error-code (err error-code)
+  )
+)
+
+(define-private (process-bid-placement (bid-info { auction-id: uint, bid-amount: uint }) (previous-result (response (list 10 uint) uint)))
+  (match previous-result
+    success-list (match (place-bid (get auction-id bid-info) (get bid-amount bid-info))
+      success (ok (unwrap! (as-max-len? (append success-list (get auction-id bid-info)) u10) ERR_INVALID_AMOUNT))
+      error-code (err error-code)
+    )
+    error-code (err error-code)
+  )
+)
+
+(define-read-only (get-batch-repayment-cost (loan-ids (list 10 uint)))
+  (fold calculate-repayment-cost loan-ids u0)
+)
+
+(define-read-only (get-batch-extension-cost (loan-ids (list 10 uint)))
+  (fold calculate-extension-cost loan-ids u0)
+)
+
+(define-private (calculate-repayment-cost (loan-id uint) (total-cost uint))
+  (match (map-get? loans loan-id)
+    loan (+ total-cost (+ (get loan-amount loan) (get interest-amount loan)))
+    total-cost
+  )
+)
+
+(define-private (calculate-extension-cost (loan-id uint) (total-cost uint))
+  (match (map-get? loans loan-id)
+    loan (+ total-cost (/ (* (get loan-amount loan) EXTENSION_FEE_RATE) u100))
+    total-cost
   )
 )
