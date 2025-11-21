@@ -1,0 +1,39 @@
+[project]
+name = "nft-collateralized-lending"
+version = "1.0.0"
+authors = ["vincentjames100 <vincentjames100p@gmail.com>"]
+description = "NFT Collateralized Lending Platform"
+clarinet_version = "3.0.2"
+
+[contracts.nft-lending]
+path = "contracts/nft-lending.clar"
+epoch = 2.05
+
+[[project.requirements]]
+contract_id = "SP1H1733V5MZ3SZ9XRW9FKYGEZT0JDGEB8Y634C7R.miamicoin-token-v2"
+
+[repl]
+api_host = "127.0.0.1"
+api_port = 20443
+db_host = "127.0.0.1"
+db_port = 20444
+
+[[repl.accounts]]
+name = "deployer"
+address = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM"
+balance = 1000000
+
+[[repl.accounts]]
+name = "wallet_1"
+address = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5"
+balance = 1000000
+
+[[repl.accounts]]
+name = "wallet_2"
+address = "ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG"
+balance = 1000000
+
+[[repl.accounts]]
+name = "wallet_3"
+address = "ST2JHG361ZXG51QTKY2NQCVBPPRRE2KZB1HR05NNC"
+balance = 1000000
