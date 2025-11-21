@@ -20,6 +20,7 @@
 (define-constant STATUS-ACTIVE u1)
 (define-constant STATUS-REPAID u2)
 (define-constant STATUS-DEFAULTED u3)
+(define-constant STATUS-CANCELLED u4)
 
 ;; Data structures
 (define-map loans 
@@ -185,6 +186,27 @@
       ERR-LOAN-ACTIVE)
     ERR-NOT-FOUND))
 
+(define-public (cancel-loan-request (loan-id uint))
+  (match (map-get? loans { loan-id: loan-id })
+    loan-data
+    (if (and (is-eq (get borrower loan-data) tx-sender)
+             (is-eq (get status loan-data) STATUS-PENDING))
+      (begin
+        (map-set nft-collateral
+          { nft-contract: (get nft-contract loan-data), nft-id: (get nft-id loan-data) }
+          {
+            loan-id: loan-id,
+            locked: false,
+            valuation: (get collateral-value loan-data),
+            lock-time: u0
+          })
+        (map-set loans
+          { loan-id: loan-id }
+          (merge loan-data { status: STATUS-CANCELLED }))
+        (ok true))
+      ERR-UNAUTHORIZED)
+    ERR-NOT-FOUND))
+
 ;; Repay loan
 (define-public (repay-loan (loan-id uint))
   (match (map-get? loans { loan-id: loan-id })
@@ -305,4 +327,6 @@
         "repaid"
         (if (is-eq status STATUS-DEFAULTED)
           "defaulted"
-          "unknown")))))
+          (if (is-eq status STATUS-CANCELLED)
+            "cancelled"
+            "unknown"))))))
